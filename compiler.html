@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<title>PL/0 Compiler</title>
+	<meta charset="UTF-8" />
+	<script type="text/javascript" src="js/jquery.min.js"></script>
+	<script type="text/javascript" src="js/jquery.terminal-0.4.22.min.js"></script>
+	<script type="text/javascript" src="js/beautify.min.js"></script>
+	<script type="text/javascript" src="js/lexer_standalone.js"></script>
+	<script type="text/javascript" src="js/parser.js"></script>
+	<script type="text/javascript" src="js/lexer.js"></script>
+	<script type="text/javascript" src="js/nameList.js"></script>
+	<script type="text/javascript" src="js/codeGen.js"></script>
+	<script type="text/javascript" src="js/virtualMachine.js"></script>
+	<script type="text/javascript" src="js/bootstrap.min.js"></script>
+	<script type="text/javascript" src="js/blobbuilder.min.js"></script>
+	<script type="text/javascript" src="js/filesaver.min.js"></script>
+	<link rel="stylesheet" href="../js_pl0_compiler%202/css/bootstrap.min.css" />
+	<link rel="stylesheet" href="../js_pl0_compiler%202/css/compiler.css" />
+	<link rel="stylesheet" href="../js_pl0_compiler%202/css/jquery.terminal.css" />
+</head>
+<body>
+<div id="wrapper">
+	<div class="clearer">
+		<div class="btn-group">
+			<button class="btn">Load example</button>
+			<button class="btn dropdown-toggle" data-toggle="dropdown">
+				<span class="caret"></span>
+			</button>
+			<ul class="dropdown-menu">
+				<li><a id="example-1" href="#">t2.pl0</a></li>
+				<li><a id="example-2" href="#">t3.pl0</a></li>
+				<li><a id="example-3" href="#">t5.pl0</a></li>
+				<li><a id="example-4" href="#">t6.pl0</a></li>
+				<li><a id="example-5" href="#">tm.pl0</a></li>
+				<li><a id="example-6" href="#">tmin.pl0</a></li>
+				<li><a id="example-7" href="#">tx.pl0</a></li>
+				<li><a id="example-8" href="#">verschachtelt.pl0</a></li>
+				<li><a id="example-9" href="#">3procedures.pl0</a></li>
+				<li><a id="example-10" href="#">consts.pl0</a></li>
+				<li><a id="example-11" href="#">comment.pl0</a></li>
+				<li><a id="example-12" href="#">else.pl0</a></li>
+				<li><a id="example-13" href="#">and.pl0</a></li>
+				<li><a id="example-14" href="#">or.pl0</a></li>
+				<li><a id="example-15" href="#">function.pl0</a></li>
+				<li><a id="example-16" href="#">for.pl0</a></li>
+			</ul>
+			<div class="fileupload fileupload-new" data-provides="fileupload">
+				<span class="btn btn-file"><span class="fileupload-new">Upload file &raquo;</span><span class="fileupload-exists">Upload file&raquo;</span><input id="fileinput" type="file" /></span>
+				<span class="fileupload-preview"></span>
+				<a href="#" class="close fileupload-exists" data-dismiss="fileupload" style="float: none">×</a>
+			</div>
+			<button class="btn btn-primary" id="lexer-submit" value="lex">Lex &raquo;</button>
+			<button class="btn btn-success" id="parser-submit" value="lexparse">Lex and parse &raquo;</button>
+			<button class="btn btn-info" id="download" value="download">Download output &raquo;</button>
+			<button class="btn btn-success" id="generate" value="generate">Generate JavaScript &raquo;</button>
+			<button class="btn btn-danger" id="clear" value="clear">Clear output &raquo;</button>
+			<button class="btn btn-success" id="vm" value="vm">Run code in virtual machine &raquo;</button>
+		</div>
+	</div>
+	<div id="clearer">
+		<div id="input-wrap">
+			<h3>PL/0-Input</h3>
+			<textarea id="input" cols="50" rows="25" style="width: 300px;">var a,b,Max;.</textarea>
+		</div>
+		<div class="tabbable">
+			<ul class="nav nav-tabs">
+				<li id="lex-nav"><a href="#output-wrap" data-toggle="tab">Lexer</a></li>
+				<li id="parse-nav"><a href="#parser-output-wrap" data-toggle="tab">Parser</a></li>
+				<li id="zc-nav" class="active"><a href="#code-wrap" data-toggle="tab">Intermediate code</a></li>
+				<li id="js-nav"><a href="#js-wrap" data-toggle="tab">JavaScript</a></li>
+				<li id="program-nav"><a href="#program-output-wrap" data-toggle="tab">Program output</a></li>
+			</ul>
+			<div class="tab-content">
+				<div id="output-wrap" class="tab-pane">
+					<textarea style="width: 98%;" id="output" cols="50" rows="25" readonly></textarea>
+				</div>
+				<div id="parser-output-wrap" class="tab-pane">
+					<textarea style="width: 98%;" id="parser-output" cols="50" rows="25" readonly></textarea>
+				</div>
+				<div id="code-wrap" class="tab-pane active">
+					<textarea style="width: 98%;" id="code-output" cols="50" rows="25" readonly></textarea>
+				</div>
+				<div id="js-wrap" class="tab-pane">
+					<textarea style="width: 98%;" id="js-output" cols="50" rows="25" readonly></textarea>
+				</div>
+				<div id="program-output-wrap" class="tab-pane">
+					<textarea style="width: 98%; display: none;" id="program-output" cols="50" rows="25" readonly></textarea>
+					<div id="terminal"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="clearer">
+		<div style="display: none;" id="loader"><img src="../js_pl0_compiler%202/img/compiler-loader.gif" alt="Lexing..." height="19" width="220"></div>
+		<div id="parse-alert" class="alert alert-block alert-error fade in">
+			<button data-dismiss="alert" class="close" type="button">×</button>
+			<h4 class="alert-heading">Oh snap! Could not parse text.</h4>
+			<p id="alert-message"></p>
+		</div>
+		<div id="parse-ok" class="alert alert-block fade in">
+			<button data-dismiss="alert" class="close" type="button">×</button>
+			<h4 class="alert-heading">Success.</h4>
+			<p id="ok-message">Code has been compiled.</p>
+		</div>
+	</div>
+</div>
+<script type="text/javascript">
+	var t2 = 'var a,b,Max;\nprocedure p1; \nbegin \n\tif a>=b then Max:=a; \n\tif a< b then Max:=b \nend; \nbegin\n\t?a;?b;\n\tcall p1;\n\t!Max\nend.',
+			t3 = 'var a,b,Max,Min,i;\nprocedure p1;\nbegin\n\tif a>=b then Max:=a;\n\tif a< b then Max:=b\nend;\nprocedure p2;\nbegin\n\tif a<=b then Min:=a;\n\tif a> b then Min:=b\nend;\nbegin\n\t?a;\n\t?b;\n\tcall p1;\n\tcall p2;\n\t!Min;\n\t!Max;\n\ti:=Min;\nwhile i<=Max do\n\tbegin\n\t\t!i;\n\t\ti:=i+1\n\tend\nend.',
+			t5 = 'var a,fac;\nProcedure p1;\nvar b;\nbegin\n\tb := a;\n\ta := a-1;\n\tif a>1 then call p1;\n\tfac := fac*b;\nend;\nbegin\n\t?a;\n\tfac := 1;\n\tcall p1;\n\t!fac;\nend.',
+			t6 = 'var a, fak;\nbegin\n\t?a;\n\tfak:=1;\n\twhile a > 0 do\n\tbegin\n\t\tfak:= fak*a;\n\t\ta:=a-1;\n\t\t! a;\n\t\t! fak\n\tend\nend .\n',
+			tm = '!- 3+ (-4).',
+			tmin = '!5.',
+			tx = 'Procedure p1;\nvar i;\nbegin\n\ti:=0;\n\twhile i<7 do\n\t\tbegin\n\t\t\ti:=i+1;\n\t\t\t!I\n\t\tend\nend;\ncall p1.',
+			nested = 'var a, b;\nprocedure p1;\nvar y,x;\n\nprocedure p2;\nbegin\n\tx:=0;\n\twhile x<=a do\n\tbegin\n\t\ty:=0;\n\t\twhile y<=b do\n\t\tbegin\n\t\t\t!x*y;\n\t\t\ty:=y+1\n\t\tend;\n\tx:=x+1\n\tend\nend;\nbegin\n\tcall p2\nend;\nbegin\n\t?a;\n\t?b;\n\tcall p1\nend.',
+			proc3 ='var a,b,c;\nProcedure p1;\nbegin\n\t!a;\nend;\nProcedure p2;\nbegin\n\t!b;\nend;\nProcedure p3;\nbegin\n\t!c;\nend;\n\nbegin\n\ta:=1;\n\tb:=2;\n\tc:=3;\n\tcall p1;\n\tcall p2;\n\tcall p3;\nend.',
+			consts = 'CONST a=2;\nvar b;\nprocedure p1;\nbegin\n\tif b>a then !b;\n\tif b<=a then !a\nend;\n\nbegin\n\t?b;\n\tcall p1\nend.',
+			comment = '/* dies ist ein kommentar \nmit mehreren \nZeilen */\n!"test".',
+			telse = 'var a,b,Max;\nprocedure p1; \nbegin \n\tif a>=b then Max:=a else Max:=b \nend; \nbegin\n\t?a;?b;\n\tcall p1;\n\t!Max\nend.',
+			tand = 'var a,b,Max;\nprocedure p1; \nbegin \n\tif a>=b and a>0 then Max:=a else Max:=b \nend; \nbegin\n\t?a;?b;\n\tcall p1;\n\t!Max\nend.',
+			tor = 'var a,b,Max;\nprocedure p1; \nbegin \n\tif a>=b or a>0 then Max:=a else Max:=b \nend; \nbegin\n\t?a;?b;\n\tcall p1;\n\t!Max\nend.',
+			func = 'var a,b;\nfunction p1(a);\nvar c;\nbegin\nc:=2;\nend;\nreturn a;\nbegin\n\ta:=2;\n\tcall p1(a)\nend.',
+			fors = 'var a;\nbegin\n\tfor (a:=1;a < 10; a:=a+1)\n\tbegin\n\t\t!a\n\tend\nend.';
+	var parser = {},
+			lexer = {},
+			vm = {},
+			terminal = {};
+	jQuery(function ($) {
+		terminal = $('#terminal').terminal(function (command, term) {
+			if (command !== '') {
+				vm.externalInput = command;
+				vm.getExternalInput();
+			}
+		}, {
+			greetings: 'VirtualMachine',
+			name: 'pl0_vm',
+			height: 520,
+			enabled: false,
+			onFocus: function () {return false;},
+			prompt: '# '
+		});
+		$('#fileinput').change(function (evt) {
+			var f = evt.target.files[0];
+			if (f) {
+				var r = new FileReader();
+				r.onload = function (e) {
+					var contents = e.target.result;
+					$('#input').val(contents);
+				};
+				r.readAsText(f);
+			} else {
+				alert('Failed to load file');
+			}
+		});
+		$('#download').click(function (evt) {
+			var bb = new BlobBuilder();
+			bb.append($('#code-output').val());
+			saveAs(bb.getBlob('text/plain;charset=utf-8'), 'output.cl');
+		});
+		$('#example-1').click(function () {
+			$('#input').val(t2);
+		});
+		$('#example-2').click(function () {
+			$('#input').val(t3);
+		});
+		$('#example-3').click(function () {
+			$('#input').val(t5);
+		});
+		$('#example-4').click(function () {
+			$('#input').val(t6);
+		});
+		$('#example-5').click(function () {
+			$('#input').val(tm);
+		});
+		$('#example-6').click(function () {
+			$('#input').val(tmin);
+		});
+		$('#example-7').click(function () {
+			$('#input').val(tx);
+		});
+		$('#example-8').click(function () {
+			$('#input').val(nested);
+		});
+		$('#example-9').click(function () {
+			$('#input').val(proc3);
+		});
+		$('#example-10').click(function () {
+			$('#input').val(consts);
+		});
+		$('#example-11').click(function () {
+			$('#input').val(comment);
+		});
+		$('#example-12').click(function () {
+			$('#input').val(telse);
+		});
+		$('#example-13').click(function () {
+			$('#input').val(tand);
+		});
+		$('#example-14').click(function () {
+			$('#input').val(tor);
+		});
+		$('#example-15').click(function () {
+			$('#input').val(func);
+		});
+		$('#example-16').click(function () {
+			$('#input').val(fors);
+		});
+		$('#input').click(function () {
+			if (typeof(terminal) !== 'undefined') {
+				terminal.disable();
+			}
+		});
+		$('#terminal').click(function () {
+			if (typeof(terminal) !== 'undefined') {
+				terminal.enable();
+			}
+		});
+		$('#parser-submit').click(function () {
+			$('#parse-ok').hide();
+			$('#loader').show();
+			$('.nav-tabs .active').removeClass('active');
+			$('.tab-content .tab-pane').removeClass('active');
+			$('#zc-nav').addClass('active');
+			$('#code-wrap').addClass('active');
+			$('#output').val('');
+			$('#parser-output').val('');
+			$('#alert-message').html('');
+			$('#parse-alert').hide();
+			window.setTimeout(function () {
+				lexer = new Lexer({input: $('#input').val()});
+				parser = new Parser({});
+			}, 500);
+		});
+		$('#clear').click(function () {
+			$('#parse-ok').hide();
+			$('#output').val('');
+			$('#parser-output').val('');
+			$('#code-output').val('');
+			$('#js-output').val('');
+			$('#program-output').val('');
+			if (typeof (terminal) !== 'undefined') {
+				terminal.clear();
+			}
+		});
+		$('#generate').click(function () {
+			$('#parse-ok').hide();
+			$('.nav-tabs .active').removeClass('active');
+			$('.tab-content .tab-pane').removeClass('active');
+			$('#js-wrap').addClass('active');
+			$('#js-nav').addClass('active');
+			$('#loader').show();
+			$('#output').val('');
+			$('#parser-output').val('');
+			$('#alert-message').html('');
+			$('#parse-alert').hide();
+			window.setTimeout(function () {
+				lexer = new Lexer({input: $('#input').val()});
+				parser = new Parser('generateCode');
+			}, 500);
+		});
+		$('#vm').click(function () {
+			$('#parse-ok').hide();
+			$('.nav-tabs .active').removeClass('active');
+			$('.tab-content .tab-pane').removeClass('active');
+			$('#program-output-wrap').addClass('active');
+			$('#program-nav').addClass('active');
+			$('#loader').show();
+			$('#output').val('');
+			$('#parser-output').val('');
+			$('#alert-message').html('');
+			$('#parse-alert').hide();
+			lexer = new Lexer({input: $('#input').val()});
+			var execVm = function () {
+				vm = new VM($('#code-output').val());
+			};
+			parser = new Parser({}, execVm);
+		});
+	});
+</script>
+</body>
+</html>
